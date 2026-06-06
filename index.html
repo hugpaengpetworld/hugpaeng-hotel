@@ -11,7 +11,7 @@
 body{margin:0;padding:18px;font-family:Arial,sans-serif;background:linear-gradient(180deg,#063f2d,#0b5a3f);color:#063f2d}
 .wrap{max-width:430px;margin:auto}
 .card{background:#fff8ea;border-radius:28px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-h1{text-align:center;margin:0;color:#063f2d}
+h1{text-align:center;margin:0;color:#063f2d;font-size:32px}
 .sub{text-align:center;color:#d9931f;font-weight:bold;margin:8px 0 18px}
 label{display:block;font-weight:bold;margin-top:12px}
 input,select,textarea{width:100%;padding:13px;border-radius:14px;border:1px solid #ddd;font-size:16px;margin-top:6px}
@@ -142,6 +142,7 @@ function showDateForm(){
     <input type="date" id="checkOut" min="${today()}">
 
     <button onclick="checkAvailability()">ตรวจสอบห้องว่าง</button>
+    <button onclick="showMyBookings()" style="background:#0b5a3f;">📋 การจองของฉัน</button>
   `);
 }
 
@@ -304,6 +305,9 @@ async function submitBooking(){
     return;
   }
 
+  const noteElement = document.getElementById("note");
+  const noteValue = noteElement ? noteElement.value : "";
+
   app(`<div class="loading">กำลังบันทึกการจอง...</div>`);
 
   try{
@@ -318,7 +322,7 @@ async function submitBooking(){
       weight:weights.join(" / "),
       checkIn:availabilityData.checkIn,
       checkOut:availabilityData.checkOut,
-      note:(document.getElementById("note") ? document.getElementById("note").value : ""),
+      note:noteValue,
       roomType:selectedRoom.roomType
     }));
 
@@ -338,6 +342,59 @@ async function submitBooking(){
     }else{
       app(`<div class="error">${data.error}</div>`);
     }
+
+  }catch(err){
+    app(`<div class="error">${err.message}</div>`);
+  }
+}
+
+async function showMyBookings(){
+  app(`<div class="loading">กำลังโหลดการจองของฉัน...</div>`);
+
+  try{
+    const data = await jsonp(buildUrl({
+      action:"getMyHotelBookings",
+      lineUserId:lineUserId
+    }));
+
+    if(!data.success){
+      app(`<div class="error">${data.error}</div>`);
+      return;
+    }
+
+    if(!data.bookings || data.bookings.length === 0){
+      app(`
+        <div class="error">ยังไม่พบประวัติการจอง</div>
+        <button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>
+      `);
+      return;
+    }
+
+    let html = `<div class="summary"><b>📋 การจองของฉัน</b></div>`;
+
+    data.bookings.forEach(b=>{
+      let statusIcon = "🟡";
+      if(b.statusCode === "CONFIRMED") statusIcon = "🟢";
+      if(b.statusCode === "CANCELLED") statusIcon = "🔴";
+      if(b.statusCode === "CHECKIN") statusIcon = "🏨";
+      if(b.statusCode === "CHECKOUT") statusIcon = "✅";
+
+      html += `
+        <div class="room">
+          <h3>${statusIcon} ${b.bookingId}</h3>
+          <div><b>สถานะ:</b> ${b.status}</div>
+          <div><b>ห้อง:</b> ${b.roomType}</div>
+          <div><b>สัตว์เลี้ยง:</b> ${b.petName}</div>
+          <div><b>เข้าพัก:</b> ${b.checkIn}</div>
+          <div><b>รับกลับ:</b> ${b.checkOut}</div>
+          <div><b>จำนวนคืน:</b> ${b.nights} คืน</div>
+          <div><b>ยอดรวม:</b> ${b.totalPrice} บาท</div>
+        </div>
+      `;
+    });
+
+    html += `<button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>`;
+    app(html);
 
   }catch(err){
     app(`<div class="error">${err.message}</div>`);
