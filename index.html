@@ -1,30 +1,30 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HUGPAENG PET HOTEL</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin:0; padding:18px; font-family:Arial,sans-serif; background:linear-gradient(180deg,#063f2d,#0b5a3f); color:#063f2d; }
-    .wrap { max-width:430px; margin:auto; }
-    .card { background:#fff8ea; border-radius:28px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.2); }
-    h1 { text-align:center; color:#063f2d; margin:0; }
-    .sub { text-align:center; color:#d9931f; font-weight:bold; margin:8px 0 20px; }
-    label { font-weight:bold; display:block; margin-top:12px; }
-    input, select, textarea { width:100%; padding:13px; border-radius:14px; border:1px solid #ddd; font-size:16px; margin-top:6px; }
-    button { width:100%; padding:14px; border:0; border-radius:14px; margin-top:14px; background:#d9931f; color:white; font-size:17px; font-weight:bold; }
-    .loading,.error,.success { padding:14px; border-radius:14px; margin-top:14px; text-align:center; font-weight:bold; }
-    .loading { background:#eef7f2; color:#063f2d; }
-    .error { background:#ffe5e5; color:#b00020; }
-    .success { background:#e8fff0; color:#067a35; }
-    .room { background:white; border-radius:20px; padding:16px; margin-top:14px; border:1px solid #f0dfbd; }
-    .room h3 { margin:0 0 6px; }
-    .price { color:#d9931f; font-weight:bold; }
-    .full { opacity:.55; }
-    .summary { background:#063f2d; color:#fff8ea; border-radius:18px; padding:16px; margin-top:14px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HUGPAENG PET HOTEL</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:18px;font-family:Arial,sans-serif;background:linear-gradient(180deg,#063f2d,#0b5a3f);color:#063f2d}
+.wrap{max-width:430px;margin:auto}
+.card{background:#fff8ea;border-radius:28px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+h1{text-align:center;margin:0;color:#063f2d}
+.sub{text-align:center;color:#d9931f;font-weight:bold;margin:8px 0 18px}
+label{display:block;font-weight:bold;margin-top:12px}
+input,select,textarea{width:100%;padding:13px;border-radius:14px;border:1px solid #ddd;font-size:16px;margin-top:6px}
+button{width:100%;padding:14px;border:0;border-radius:14px;margin-top:14px;background:#d9931f;color:white;font-size:17px;font-weight:bold}
+.loading,.error,.success{padding:14px;border-radius:14px;margin-top:14px;text-align:center;font-weight:bold}
+.loading{background:#eef7f2;color:#063f2d}
+.error{background:#ffe5e5;color:#b00020}
+.success{background:#e8fff0;color:#067a35}
+.room,.petbox{background:white;border-radius:20px;padding:16px;margin-top:14px;border:1px solid #f0dfbd}
+.price{color:#d9931f;font-weight:bold}
+.summary{background:#063f2d;color:#fff8ea;border-radius:18px;padding:16px;margin-top:14px}
+.small{font-size:13px;color:#666;margin-top:6px}
+</style>
 </head>
 
 <body>
@@ -32,7 +32,6 @@
   <div class="card">
     <h1>🏨 HUGPAENG PET HOTEL</h1>
     <div class="sub">จองห้องพักสำหรับน้องแมว</div>
-
     <div id="app" class="loading">กำลังเข้าสู่ระบบ LINE...</div>
   </div>
 </div>
@@ -42,6 +41,7 @@ const LIFF_ID = "2010307463-SVTgH8On";
 const API_URL = "https://script.google.com/macros/s/AKfycbzI4JBgyC74yfJoRhGh068wmxFo6abwmly9IqngiN0_FnXCMTKmVCAodaLdfHq1WufUJQ/exec";
 
 let lineUserId = "";
+let memberData = null;
 let selectedRoom = null;
 let availabilityData = null;
 
@@ -51,15 +51,41 @@ function jsonp(url){
   return new Promise((resolve,reject)=>{
     const cb = "cb_" + Date.now() + "_" + Math.floor(Math.random()*99999);
     const script = document.createElement("script");
+    let finished = false;
+
     window[cb] = data => {
+      finished = true;
       delete window[cb];
-      document.body.removeChild(script);
+      if(script.parentNode) document.body.removeChild(script);
       resolve(data);
     };
-    script.onerror = () => reject(new Error("เชื่อมต่อ API ไม่สำเร็จ"));
+
+    script.onerror = () => {
+      if(finished) return;
+      finished = true;
+      reject(new Error("เชื่อมต่อ API ไม่สำเร็จ"));
+    };
+
     script.src = url + "&callback=" + cb + "&t=" + Date.now();
     document.body.appendChild(script);
+
+    setTimeout(()=>{
+      if(!finished){
+        finished = true;
+        delete window[cb];
+        if(script.parentNode) document.body.removeChild(script);
+        reject(new Error("API ตอบกลับช้าเกินไป"));
+      }
+    },15000);
   });
+}
+
+function buildUrl(params){
+  let q = [];
+  for(let key in params){
+    q.push(encodeURIComponent(key) + "=" + encodeURIComponent(params[key] || ""));
+  }
+  return API_URL + "?" + q.join("&");
 }
 
 async function main(){
@@ -73,6 +99,16 @@ async function main(){
 
     const profile = await liff.getProfile();
     lineUserId = profile.userId;
+
+    const member = await jsonp(buildUrl({
+      action:"getByLineUserId",
+      lineUserId:lineUserId
+    }));
+
+    if(member && member.found){
+      memberData = member;
+    }
+
     showDateForm();
 
   }catch(err){
@@ -86,6 +122,19 @@ function today(){
 
 function showDateForm(){
   app(`
+    ${memberData ? `
+      <div class="success">
+        พบข้อมูลสมาชิก<br>
+        ${memberData.name}<br>
+        ${memberData.phone}
+      </div>
+    ` : `
+      <div class="error">
+        ยังไม่พบข้อมูลสมาชิก<br>
+        สามารถจองได้ แต่กรุณากรอกข้อมูลผู้จอง
+      </div>
+    `}
+
     <label>วันที่เข้าพัก</label>
     <input type="date" id="checkIn" min="${today()}">
 
@@ -109,10 +158,11 @@ async function checkAvailability(){
   app(`<div class="loading">กำลังตรวจสอบห้องว่าง...</div>`);
 
   try{
-    const data = await jsonp(
-      API_URL + "?action=getHotelAvailability&checkIn=" + encodeURIComponent(checkIn) +
-      "&checkOut=" + encodeURIComponent(checkOut)
-    );
+    const data = await jsonp(buildUrl({
+      action:"getHotelAvailability",
+      checkIn:checkIn,
+      checkOut:checkOut
+    }));
 
     if(!data.success){
       app(`<div class="error">${data.error}</div>`);
@@ -128,6 +178,13 @@ async function checkAvailability(){
   }
 }
 
+function maxPetsByRoom(roomType){
+  if(roomType === "Standard") return 1;
+  if(roomType === "Superior") return 2;
+  if(roomType === "Suite") return 4;
+  return 1;
+}
+
 function showRooms(data){
   let html = `
     <div class="summary">
@@ -139,7 +196,7 @@ function showRooms(data){
 
   data.rooms.forEach(room=>{
     html += `
-      <div class="room ${room.isAvailable ? "" : "full"}">
+      <div class="room">
         <h3>${room.roomType} (${room.roomName})</h3>
         <div>${room.description}</div>
         <div class="price">${room.price} บาท / คืน</div>
@@ -160,36 +217,51 @@ function showRooms(data){
 
 function selectRoom(room){
   selectedRoom = room;
+  const maxPets = maxPetsByRoom(room.roomType);
+
+  let petForms = "";
+  for(let i=1;i<=maxPets;i++){
+    petForms += `
+      <div class="petbox">
+        <b>ข้อมูลสัตว์เลี้ยงตัวที่ ${i}</b>
+
+        <label>ชื่อสัตว์เลี้ยง</label>
+        <input id="petName${i}" placeholder="เช่น ลำเพลิน">
+
+        <label>ประเภทสัตว์เลี้ยง</label>
+        <select id="petType${i}">
+          <option value="แมว">แมว</option>
+          <option value="สุนัข">สุนัข</option>
+          <option value="อื่น ๆ">อื่น ๆ</option>
+        </select>
+
+        <label>สายพันธุ์</label>
+        <input id="breed${i}" placeholder="เช่น ไทย, เปอร์เซีย">
+
+        <label>น้ำหนัก</label>
+        <input id="weight${i}" placeholder="เช่น 4 กก.">
+      </div>
+    `;
+  }
 
   app(`
     <div class="summary">
       <b>ห้องที่เลือก:</b> ${room.roomType} (${room.roomName})<br>
+      <b>รองรับสัตว์เลี้ยงสูงสุด:</b> ${maxPets} ตัว<br>
       <b>ราคา:</b> ${room.price} บาท / คืน<br>
       <b>จำนวนคืน:</b> ${availabilityData.nights} คืน<br>
       <b>รวม:</b> ${room.totalPrice} บาท
     </div>
 
     <label>ชื่อผู้จอง</label>
-    <input id="customerName" placeholder="ชื่อ-นามสกุล">
+    <input id="customerName" value="${memberData ? memberData.name : ""}" placeholder="ชื่อ-นามสกุล">
 
     <label>เบอร์โทร</label>
-    <input id="phone" type="tel" placeholder="08xxxxxxxx">
+    <input id="phone" type="tel" value="${memberData ? memberData.phone : ""}" placeholder="08xxxxxxxx">
 
-    <label>ชื่อสัตว์เลี้ยง</label>
-    <input id="petName" placeholder="เช่น ลำเพลิน">
+    <div class="small">สามารถแก้ไขชื่อและเบอร์โทรสำหรับการจองครั้งนี้ได้</div>
 
-    <label>ประเภทสัตว์เลี้ยง</label>
-    <select id="petType">
-      <option value="แมว">แมว</option>
-      <option value="สุนัข">สุนัข</option>
-      <option value="อื่น ๆ">อื่น ๆ</option>
-    </select>
-
-    <label>สายพันธุ์</label>
-    <input id="breed" placeholder="เช่น ไทย, เปอร์เซีย">
-
-    <label>น้ำหนัก</label>
-    <input id="weight" placeholder="เช่น 4 กก.">
+    ${petForms}
 
     <label>หมายเหตุ</label>
     <textarea id="note" rows="3" placeholder="เช่น แพ้อาหาร, ต้องกินยา, ขี้กลัว"></textarea>
@@ -202,33 +274,53 @@ function selectRoom(room){
 async function submitBooking(){
   const customerName = document.getElementById("customerName").value.trim();
   const phone = document.getElementById("phone").value.trim();
-  const petName = document.getElementById("petName").value.trim();
+  const maxPets = maxPetsByRoom(selectedRoom.roomType);
 
-  if(!customerName || !phone || !petName){
-    app(`<div class="error">กรุณากรอกชื่อผู้จอง เบอร์โทร และชื่อสัตว์เลี้ยง</div>`);
+  if(!customerName || !phone){
+    app(`<div class="error">กรุณากรอกชื่อผู้จองและเบอร์โทร</div>`);
+    setTimeout(()=>selectRoom(selectedRoom),1500);
+    return;
+  }
+
+  let names=[], types=[], breeds=[], weights=[];
+
+  for(let i=1;i<=maxPets;i++){
+    const name = document.getElementById("petName"+i).value.trim();
+    const type = document.getElementById("petType"+i).value;
+    const breed = document.getElementById("breed"+i).value.trim();
+    const weight = document.getElementById("weight"+i).value.trim();
+
+    if(name){
+      names.push(name);
+      types.push(type);
+      breeds.push(breed || "-");
+      weights.push(weight || "-");
+    }
+  }
+
+  if(names.length === 0){
+    app(`<div class="error">กรุณากรอกข้อมูลสัตว์เลี้ยงอย่างน้อย 1 ตัว</div>`);
     setTimeout(()=>selectRoom(selectedRoom),1500);
     return;
   }
 
   app(`<div class="loading">กำลังบันทึกการจอง...</div>`);
 
-  const params = new URLSearchParams({
-    action: "createHotelBooking",
-    lineUserId,
-    customerName,
-    phone,
-    petName,
-    petType: document.getElementById("petType").value,
-    breed: document.getElementById("breed").value,
-    weight: document.getElementById("weight").value,
-    checkIn: availabilityData.checkIn,
-    checkOut: availabilityData.checkOut,
-    note: document.getElementById("note").value,
-    roomType: selectedRoom.roomType
-  });
-
   try{
-    const data = await jsonp(API_URL + "?" + params.toString());
+    const data = await jsonp(buildUrl({
+      action:"createHotelBooking",
+      lineUserId:lineUserId,
+      customerName:customerName,
+      phone:phone,
+      petName:names.join(" / "),
+      petType:types.join(" / "),
+      breed:breeds.join(" / "),
+      weight:weights.join(" / "),
+      checkIn:availabilityData.checkIn,
+      checkOut:availabilityData.checkOut,
+      note:document.getElementById("note").value,
+      roomType:selectedRoom.roomType
+    }));
 
     if(data.success){
       app(`
