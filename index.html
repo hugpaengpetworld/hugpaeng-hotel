@@ -318,7 +318,7 @@ async function submitBooking(){
       weight:weights.join(" / "),
       checkIn:availabilityData.checkIn,
       checkOut:availabilityData.checkOut,
-      note:document.getElementById("note").value,
+      note:(document.getElementById("note") ? document.getElementById("note").value : ""),
       roomType:selectedRoom.roomType
     }));
 
