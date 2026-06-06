@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HUGPAENG PET HOTEL</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; padding:18px; font-family:Arial,sans-serif; background:linear-gradient(180deg,#063f2d,#0b5a3f); color:#063f2d; }
+    .wrap { max-width:430px; margin:auto; }
+    .card { background:#fff8ea; border-radius:28px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.2); }
+    h1 { text-align:center; color:#063f2d; margin:0; }
+    .sub { text-align:center; color:#d9931f; font-weight:bold; margin:8px 0 20px; }
+    label { font-weight:bold; display:block; margin-top:12px; }
+    input, select, textarea { width:100%; padding:13px; border-radius:14px; border:1px solid #ddd; font-size:16px; margin-top:6px; }
+    button { width:100%; padding:14px; border:0; border-radius:14px; margin-top:14px; background:#d9931f; color:white; font-size:17px; font-weight:bold; }
+    .loading,.error,.success { padding:14px; border-radius:14px; margin-top:14px; text-align:center; font-weight:bold; }
+    .loading { background:#eef7f2; color:#063f2d; }
+    .error { background:#ffe5e5; color:#b00020; }
+    .success { background:#e8fff0; color:#067a35; }
+    .room { background:white; border-radius:20px; padding:16px; margin-top:14px; border:1px solid #f0dfbd; }
+    .room h3 { margin:0 0 6px; }
+    .price { color:#d9931f; font-weight:bold; }
+    .full { opacity:.55; }
+    .summary { background:#063f2d; color:#fff8ea; border-radius:18px; padding:16px; margin-top:14px; }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>🏨 HUGPAENG PET HOTEL</h1>
+    <div class="sub">จองห้องพักสำหรับน้องแมว</div>
+
+    <div id="app" class="loading">กำลังเข้าสู่ระบบ LINE...</div>
+  </div>
+</div>
+
+<script>
+const LIFF_ID = "2010307463-T9kVRpcj";
+const API_URL = "https://script.google.com/macros/s/AKfycbzI4JBgyC74yfJoRhGh068wmxFo6abwmly9IqngiN0_FnXCMTKmVCAodaLdfHq1WufUJQ/exec";
+
+let lineUserId = "";
+let selectedRoom = null;
+let availabilityData = null;
+
+function app(html){ document.getElementById("app").innerHTML = html; }
+
+function jsonp(url){
+  return new Promise((resolve,reject)=>{
+    const cb = "cb_" + Date.now() + "_" + Math.floor(Math.random()*99999);
+    const script = document.createElement("script");
+    window[cb] = data => {
+      delete window[cb];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    script.onerror = () => reject(new Error("เชื่อมต่อ API ไม่สำเร็จ"));
+    script.src = url + "&callback=" + cb + "&t=" + Date.now();
+    document.body.appendChild(script);
+  });
+}
+
+async function main(){
+  try{
+    await liff.init({ liffId: LIFF_ID });
+
+    if(!liff.isLoggedIn()){
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    lineUserId = profile.userId;
+    showDateForm();
+
+  }catch(err){
+    app(`<div class="error">เกิดข้อผิดพลาด: ${err.message}</div>`);
+  }
+}
+
+function today(){
+  return new Date().toISOString().split("T")[0];
+}
+
+function showDateForm(){
+  app(`
+    <label>วันที่เข้าพัก</label>
+    <input type="date" id="checkIn" min="${today()}">
+
+    <label>วันที่รับกลับ</label>
+    <input type="date" id="checkOut" min="${today()}">
+
+    <button onclick="checkAvailability()">ตรวจสอบห้องว่าง</button>
+  `);
+}
+
+async function checkAvailability(){
+  const checkIn = document.getElementById("checkIn").value;
+  const checkOut = document.getElementById("checkOut").value;
+
+  if(!checkIn || !checkOut){
+    app(`<div class="error">กรุณาเลือกวันที่เข้าพักและวันที่รับกลับ</div>`);
+    setTimeout(showDateForm,1200);
+    return;
+  }
+
+  app(`<div class="loading">กำลังตรวจสอบห้องว่าง...</div>`);
+
+  try{
+    const data = await jsonp(
+      API_URL + "?action=getHotelAvailability&checkIn=" + encodeURIComponent(checkIn) +
+      "&checkOut=" + encodeURIComponent(checkOut)
+    );
+
+    if(!data.success){
+      app(`<div class="error">${data.error}</div>`);
+      setTimeout(showDateForm,1500);
+      return;
+    }
+
+    availabilityData = data;
+    showRooms(data);
+
+  }catch(err){
+    app(`<div class="error">${err.message}</div>`);
+  }
+}
+
+function showRooms(data){
+  let html = `
+    <div class="summary">
+      <b>วันที่เข้าพัก:</b> ${data.checkIn}<br>
+      <b>วันที่รับกลับ:</b> ${data.checkOut}<br>
+      <b>จำนวนคืน:</b> ${data.nights} คืน
+    </div>
+  `;
+
+  data.rooms.forEach(room=>{
+    html += `
+      <div class="room ${room.isAvailable ? "" : "full"}">
+        <h3>${room.roomType} (${room.roomName})</h3>
+        <div>${room.description}</div>
+        <div class="price">${room.price} บาท / คืน</div>
+        <div>ว่าง ${room.availableRooms} จาก ${room.totalRooms} ห้อง</div>
+        <div>รวม ${room.totalPrice} บาท</div>
+        ${
+          room.isAvailable
+          ? `<button onclick='selectRoom(${JSON.stringify(room)})'>เลือกห้องนี้</button>`
+          : `<button disabled style="background:#aaa;">เต็มแล้ว</button>`
+        }
+      </div>
+    `;
+  });
+
+  html += `<button onclick="showDateForm()" style="background:#0b5a3f;">เปลี่ยนวันที่</button>`;
+  app(html);
+}
+
+function selectRoom(room){
+  selectedRoom = room;
+
+  app(`
+    <div class="summary">
+      <b>ห้องที่เลือก:</b> ${room.roomType} (${room.roomName})<br>
+      <b>ราคา:</b> ${room.price} บาท / คืน<br>
+      <b>จำนวนคืน:</b> ${availabilityData.nights} คืน<br>
+      <b>รวม:</b> ${room.totalPrice} บาท
+    </div>
+
+    <label>ชื่อผู้จอง</label>
+    <input id="customerName" placeholder="ชื่อ-นามสกุล">
+
+    <label>เบอร์โทร</label>
+    <input id="phone" type="tel" placeholder="08xxxxxxxx">
+
+    <label>ชื่อสัตว์เลี้ยง</label>
+    <input id="petName" placeholder="เช่น ลำเพลิน">
+
+    <label>ประเภทสัตว์เลี้ยง</label>
+    <select id="petType">
+      <option value="แมว">แมว</option>
+      <option value="สุนัข">สุนัข</option>
+      <option value="อื่น ๆ">อื่น ๆ</option>
+    </select>
+
+    <label>สายพันธุ์</label>
+    <input id="breed" placeholder="เช่น ไทย, เปอร์เซีย">
+
+    <label>น้ำหนัก</label>
+    <input id="weight" placeholder="เช่น 4 กก.">
+
+    <label>หมายเหตุ</label>
+    <textarea id="note" rows="3" placeholder="เช่น แพ้อาหาร, ต้องกินยา, ขี้กลัว"></textarea>
+
+    <button onclick="submitBooking()">ส่งคำขอจอง</button>
+    <button onclick="showRooms(availabilityData)" style="background:#0b5a3f;">กลับไปเลือกห้อง</button>
+  `);
+}
+
+async function submitBooking(){
+  const customerName = document.getElementById("customerName").value.trim();
+  const phone = document.getElementById("phone").value.trim();
+  const petName = document.getElementById("petName").value.trim();
+
+  if(!customerName || !phone || !petName){
+    app(`<div class="error">กรุณากรอกชื่อผู้จอง เบอร์โทร และชื่อสัตว์เลี้ยง</div>`);
+    setTimeout(()=>selectRoom(selectedRoom),1500);
+    return;
+  }
+
+  app(`<div class="loading">กำลังบันทึกการจอง...</div>`);
+
+  const params = new URLSearchParams({
+    action: "createHotelBooking",
+    lineUserId,
+    customerName,
+    phone,
+    petName,
+    petType: document.getElementById("petType").value,
+    breed: document.getElementById("breed").value,
+    weight: document.getElementById("weight").value,
+    checkIn: availabilityData.checkIn,
+    checkOut: availabilityData.checkOut,
+    note: document.getElementById("note").value,
+    roomType: selectedRoom.roomType
+  });
+
+  try{
+    const data = await jsonp(API_URL + "?" + params.toString());
+
+    if(data.success){
+      app(`
+        <div class="success">
+          จองสำเร็จ 🎉<br><br>
+          Booking ID<br>
+          <b>${data.bookingId}</b><br><br>
+          ห้อง: ${data.roomType} (${data.roomName})<br>
+          จำนวนคืน: ${data.nights} คืน<br>
+          รวม: ${data.totalPrice} บาท<br><br>
+          สถานะ: ${data.status}<br><br>
+          เจ้าหน้าที่จะติดต่อกลับผ่าน LINE เพื่อยืนยันการจอง
+        </div>
+      `);
+    }else{
+      app(`<div class="error">${data.error}</div>`);
+    }
+
+  }catch(err){
+    app(`<div class="error">${err.message}</div>`);
+  }
+}
+
+main();
+</script>
+</body>
+</html>
