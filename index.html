@@ -439,6 +439,8 @@ function renderBookingCard(b){
     </div>
   `;
 }
+
+async function cancelMyBooking(bookingId){
   if(!confirm("ต้องการยกเลิกการจอง " + bookingId + " ใช่หรือไม่?")) return;
 
   app(`<div class="loading">กำลังยกเลิกการจอง...</div>`);
