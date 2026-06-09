@@ -371,33 +371,40 @@ async function showMyBookings(){
       return;
     }
 
-    let html = `<div class="summary"><b>📋 การจองของฉัน</b></div>`;
+    const activeBookings = data.bookings.filter(b =>
+      b.statusCode === "PENDING" ||
+      b.statusCode === "CONFIRMED" ||
+      b.statusCode === "CHECKIN"
+    );
 
-    data.bookings.forEach(b=>{
-      let statusIcon = "🟡";
-      if(b.statusCode === "CONFIRMED") statusIcon = "🟢";
-      if(b.statusCode === "CANCELLED") statusIcon = "🔴";
-      if(b.statusCode === "CHECKIN") statusIcon = "🏨";
-      if(b.statusCode === "CHECKOUT") statusIcon = "✅";
+    const historyBookings = data.bookings.filter(b =>
+      b.statusCode === "CANCELLED" ||
+      b.statusCode === "CHECKOUT"
+    );
 
-      html += `
-        <div class="room">
-          <h3>${statusIcon} ${b.bookingId}</h3>
-          <div><b>สถานะ:</b> ${b.status}</div>
-          <div><b>ห้อง:</b> ${b.roomType}</div>
-          <div><b>สัตว์เลี้ยง:</b> ${b.petName}</div>
-          <div><b>เข้าพัก:</b> ${b.checkIn}</div>
-          <div><b>รับกลับ:</b> ${b.checkOut}</div>
-          <div><b>จำนวนคืน:</b> ${b.nights} คืน</div>
-          <div><b>ยอดรวม:</b> ${b.totalPrice} บาท</div>
-          ${
-            b.statusCode === "PENDING"
-            ? `<button onclick="cancelMyBooking('${b.bookingId}')" style="background:#b00020;">❌ ยกเลิกการจอง</button>`
-            : ``
-          }
-        </div>
-      `;
-    });
+    let html = `
+      <div class="summary"><b>📋 การจองปัจจุบัน</b></div>
+    `;
+
+    if(activeBookings.length === 0){
+      html += `<div class="error">ยังไม่มีการจองที่กำลังดำเนินการ</div>`;
+    }else{
+      activeBookings.forEach(b=>{
+        html += renderBookingCard(b);
+      });
+    }
+
+    html += `
+      <div class="summary" style="margin-top:18px;"><b>📚 ประวัติการจอง</b></div>
+    `;
+
+    if(historyBookings.length === 0){
+      html += `<div class="error">ยังไม่มีประวัติการจอง</div>`;
+    }else{
+      historyBookings.forEach(b=>{
+        html += renderBookingCard(b);
+      });
+    }
 
     html += `<button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>`;
     app(html);
@@ -407,7 +414,31 @@ async function showMyBookings(){
   }
 }
 
-async function cancelMyBooking(bookingId){
+function renderBookingCard(b){
+  let statusIcon = "🟡";
+  if(b.statusCode === "CONFIRMED") statusIcon = "🟢";
+  if(b.statusCode === "CANCELLED") statusIcon = "🔴";
+  if(b.statusCode === "CHECKIN") statusIcon = "🏨";
+  if(b.statusCode === "CHECKOUT") statusIcon = "✅";
+
+  return `
+    <div class="room">
+      <h3>${statusIcon} ${b.bookingId}</h3>
+      <div><b>สถานะ:</b> ${b.status}</div>
+      <div><b>ห้อง:</b> ${b.roomType}</div>
+      <div><b>สัตว์เลี้ยง:</b> ${b.petName}</div>
+      <div><b>เข้าพัก:</b> ${b.checkIn}</div>
+      <div><b>รับกลับ:</b> ${b.checkOut}</div>
+      <div><b>จำนวนคืน:</b> ${b.nights} คืน</div>
+      <div><b>ยอดรวม:</b> ${b.totalPrice} บาท</div>
+      ${
+        b.statusCode === "PENDING"
+        ? `<button onclick="cancelMyBooking('${b.bookingId}')" style="background:#b00020;">❌ ยกเลิกการจอง</button>`
+        : ``
+      }
+    </div>
+  `;
+}
   if(!confirm("ต้องการยกเลิกการจอง " + bookingId + " ใช่หรือไม่?")) return;
 
   app(`<div class="loading">กำลังยกเลิกการจอง...</div>`);
