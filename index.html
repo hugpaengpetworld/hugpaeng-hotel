@@ -338,6 +338,7 @@ async function submitBooking(){
           สถานะ: ${data.status}<br><br>
           เจ้าหน้าที่จะติดต่อกลับผ่าน LINE เพื่อยืนยันการจอง
         </div>
+        <button onclick="showMyBookings()" style="background:#0b5a3f;">📋 ดูการจองของฉัน</button>
       `);
     }else{
       app(`<div class="error">${data.error}</div>`);
@@ -389,6 +390,11 @@ async function showMyBookings(){
           <div><b>รับกลับ:</b> ${b.checkOut}</div>
           <div><b>จำนวนคืน:</b> ${b.nights} คืน</div>
           <div><b>ยอดรวม:</b> ${b.totalPrice} บาท</div>
+          ${
+            b.statusCode === "PENDING"
+            ? `<button onclick="cancelMyBooking('${b.bookingId}')" style="background:#b00020;">❌ ยกเลิกการจอง</button>`
+            : ``
+          }
         </div>
       `;
     });
@@ -398,6 +404,43 @@ async function showMyBookings(){
 
   }catch(err){
     app(`<div class="error">${err.message}</div>`);
+  }
+}
+
+async function cancelMyBooking(bookingId){
+  if(!confirm("ต้องการยกเลิกการจอง " + bookingId + " ใช่หรือไม่?")) return;
+
+  app(`<div class="loading">กำลังยกเลิกการจอง...</div>`);
+
+  try{
+    const data = await jsonp(buildUrl({
+      action:"cancelMyHotelBooking",
+      lineUserId:lineUserId,
+      bookingId:bookingId
+    }));
+
+    if(data.success){
+      app(`
+        <div class="success">
+          ยกเลิกการจองเรียบร้อยแล้ว<br><br>
+          Booking ID<br>
+          <b>${data.bookingId}</b><br><br>
+          สถานะ: ${data.status}
+        </div>
+        <button onclick="showMyBookings()" style="background:#0b5a3f;">กลับไปดูการจองของฉัน</button>
+      `);
+    }else{
+      app(`
+        <div class="error">${data.error}</div>
+        <button onclick="showMyBookings()" style="background:#0b5a3f;">กลับไปดูการจองของฉัน</button>
+      `);
+    }
+
+  }catch(err){
+    app(`
+      <div class="error">${err.message}</div>
+      <button onclick="showMyBookings()" style="background:#0b5a3f;">กลับไปดูการจองของฉัน</button>
+    `);
   }
 }
 
