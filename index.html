@@ -44,6 +44,8 @@ let lineUserId = "";
 let memberData = null;
 let selectedRoom = null;
 let availabilityData = null;
+let latestMyBookings = [];
+let showBookingHistory = false;
 
 function app(html){ document.getElementById("app").innerHTML = html; }
 
@@ -350,6 +352,7 @@ async function submitBooking(){
 }
 
 async function showMyBookings(){
+  showBookingHistory = false;
   app(`<div class="loading">กำลังโหลดการจองของฉัน...</div>`);
 
   try{
@@ -363,40 +366,52 @@ async function showMyBookings(){
       return;
     }
 
-    if(!data.bookings || data.bookings.length === 0){
-      app(`
-        <div class="error">ยังไม่พบประวัติการจอง</div>
-        <button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>
-      `);
-      return;
-    }
+    latestMyBookings = data.bookings || [];
+    renderMyBookings();
 
-    const activeBookings = data.bookings.filter(b =>
-      b.statusCode === "PENDING" ||
-      b.statusCode === "CONFIRMED" ||
-      b.statusCode === "CHECKIN"
-    );
+  }catch(err){
+    app(`<div class="error">${err.message}</div>`);
+  }
+}
 
-    const historyBookings = data.bookings.filter(b =>
-      b.statusCode === "CANCELLED" ||
-      b.statusCode === "CHECKOUT"
-    );
+function renderMyBookings(){
+  if(!latestMyBookings || latestMyBookings.length === 0){
+    app(`
+      <div class="error">ยังไม่พบประวัติการจอง</div>
+      <button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>
+    `);
+    return;
+  }
 
-    let html = `
-      <div class="summary"><b>📋 การจองปัจจุบัน</b></div>
-    `;
+  const activeBookings = latestMyBookings.filter(b =>
+    b.statusCode === "PENDING" ||
+    b.statusCode === "CONFIRMED" ||
+    b.statusCode === "CHECKIN"
+  );
 
-    if(activeBookings.length === 0){
-      html += `<div class="error">ยังไม่มีการจองที่กำลังดำเนินการ</div>`;
-    }else{
-      activeBookings.forEach(b=>{
-        html += renderBookingCard(b);
-      });
-    }
+  const historyBookings = latestMyBookings.filter(b =>
+    b.statusCode === "CANCELLED" ||
+    b.statusCode === "CHECKOUT"
+  );
 
-    html += `
-      <div class="summary" style="margin-top:18px;"><b>📚 ประวัติการจอง</b></div>
-    `;
+  let html = `<div class="summary"><b>📋 การจองปัจจุบัน</b></div>`;
+
+  if(activeBookings.length === 0){
+    html += `<div class="error">ยังไม่มีการจองที่กำลังดำเนินการ</div>`;
+  }else{
+    activeBookings.forEach(b=>{
+      html += renderBookingCard(b);
+    });
+  }
+
+  html += `
+    <button onclick="toggleBookingHistory()" style="background:#d9931f;">
+      ${showBookingHistory ? "📚 ซ่อนประวัติการจอง" : "📚 ดูประวัติการจอง"} (${historyBookings.length})
+    </button>
+  `;
+
+  if(showBookingHistory){
+    html += `<div class="summary" style="margin-top:18px;"><b>📚 ประวัติการจอง</b></div>`;
 
     if(historyBookings.length === 0){
       html += `<div class="error">ยังไม่มีประวัติการจอง</div>`;
@@ -405,13 +420,15 @@ async function showMyBookings(){
         html += renderBookingCard(b);
       });
     }
-
-    html += `<button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>`;
-    app(html);
-
-  }catch(err){
-    app(`<div class="error">${err.message}</div>`);
   }
+
+  html += `<button onclick="showDateForm()" style="background:#0b5a3f;">กลับไปจองห้องพัก</button>`;
+  app(html);
+}
+
+function toggleBookingHistory(){
+  showBookingHistory = !showBookingHistory;
+  renderMyBookings();
 }
 
 function renderBookingCard(b){
